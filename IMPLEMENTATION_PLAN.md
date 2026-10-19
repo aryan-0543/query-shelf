@@ -59,7 +59,7 @@ boundary.
 
 ## 2. Document loading
 
-**Status:** In progress
+**Status:** Complete
 
 ### Objective
 
@@ -108,7 +108,7 @@ extraction or downstream RAG logic.
 
 ## 3. PDF text extraction
 
-**Status:** Pending
+**Status:** Complete
 
 ### Objective
 
@@ -118,27 +118,33 @@ Extract ordered, page-aware text from one local PDF.
 
 ```text
 app/pdf_extractor.py
+scripts/manual_load_pdf.py
 tests/test_pdf_extractor.py
 ```
 
 ### Implementation tasks
 
-- Open PDFs with PyMuPDF.
-- Extract text page by page.
-- Preserve page number and source metadata.
-- Report missing, unreadable, and invalid PDFs explicitly.
+- Accept the open PyMuPDF document returned by `load_pdf()`.
+- Extract text page by page without opening or closing the document.
+- Return ordered `PageText` records with one-based page numbers.
+- Preserve empty pages as records with empty text.
+- Raise a page-specific `TextExtractionError` when extraction fails.
+- Extend the central manual verification script to display extraction
+  progress and each page's text while safely closing the document.
 
 ### Tests
 
-- Valid fixture PDF extraction.
-- Page ordering and metadata.
+- Successful extraction from a multi-page PDF.
+- Page ordering and one-based page numbers.
 - Empty-page behavior.
-- Missing-file and invalid-PDF errors.
+- Page extraction error handling.
+- Manual extraction output and error handling.
 
 ### Completion criteria
 
-Given a valid PDF, extraction returns deterministic page-level records with
-traceable source metadata.
+Given an open PDF, extraction returns deterministic page-level records with
+traceable page numbers, preserves empty pages, and reports extraction errors
+explicitly. Focused extraction tests and the existing loader tests pass.
 
 ## 4. Chunking
 

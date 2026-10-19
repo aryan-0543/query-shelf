@@ -2,9 +2,8 @@
 
 ## Status and scope
 
-This document describes the proposed initial architecture. The repository
-currently contains documentation and configuration only; no application
-components have been implemented or verified yet.
+This document describes the proposed initial architecture. The repository currently has verified document-loading and page-level
+text-extraction components. Later RAG components remain planned.
 
 The file structure below is an initial boundary for learning and testing. It
 may evolve as the project grows. If a feature requires a new module, folder, or
@@ -86,10 +85,11 @@ added only when a concrete feature makes the boundary useful.
 
 The `scripts/` directory is separate from `tests/` and contains manually run
 developer checks. `manual_load_pdf.py` exercises only the document-loading
-boundary; it is not part of the automated pytest suite and does not perform
-text extraction or downstream RAG processing. Run it from the repository root
-as `python -m scripts.manual_load_pdf` so the application package resolves
-consistently in VS Code and other Python environments.
+and page-level text-extraction boundaries; it is not part of the automated
+pytest suite and does not perform chunking or downstream RAG processing. Run
+it from the repository root as `python -m scripts.manual_load_pdf` so the
+application package resolves consistently in VS Code and other Python
+environments.
 
 ## Component responsibilities and boundaries
 
@@ -120,12 +120,17 @@ ownership independently testable.
 
 ### Text extraction
 
-`pdf_extractor.py` will open a local PDF with PyMuPDF and produce page-level
-text records from a document provided by the loading boundary. Each record
-will retain page number and source-document metadata.
+`pdf_extractor.py` extracts text page by page from the open PyMuPDF document
+provided by the loading boundary. It returns immutable page-text records with
+one-based page numbers, retains empty pages, and raises a clear
+page-specific error if extraction fails.
 
-**Input:** loaded PyMuPDF document and source metadata
-**Output:** ordered page-level text records with metadata
+**Input:** loaded PyMuPDF document
+**Output:** ordered `PageText` records with page numbers and text
+
+The caller owns and closes the document; this module does not open files or
+close the document. Keeping loading separate from extraction makes resource
+ownership and page-level extraction independently testable.
 
 ### Chunking
 

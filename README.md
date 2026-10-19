@@ -8,10 +8,11 @@ independently.
 
 ## Current status
 
-This repository currently contains project documentation and configuration
-templates only. The application code has not been implemented yet.
+The document-loading and page-level text-extraction components are implemented
+and covered by focused tests. The remaining RAG pipeline components are still
+planned and have not been implemented or verified.
 
-The initial implementation will support:
+The planned initial implementation will support:
 
 - One local PDF at a time.
 - Page-aware text extraction with PyMuPDF.
@@ -131,20 +132,18 @@ data should remain local and uncommitted.
 
 ## Usage
 
-Application usage will be documented here after the CLI milestone is
-implemented and verified. The approved initial interaction is an interactive
-question loop:
+The full application usage will be documented here after the CLI milestone is
+implemented and verified. The current manually verifiable document workflow
+is:
 
-1. Provide a local PDF to the CLI.
-2. The application extracts and chunks its text.
-3. It generates embeddings locally and stores them in ChromaDB.
-4. Enter questions interactively.
-5. The application retrieves relevant chunks.
-6. Gemini receives the question and retrieved context.
-7. The CLI displays a grounded answer and available source/page references.
+1. Set `PDF_PATH` in `scripts/manual_load_pdf.py` to a local PDF.
+2. Run `python -m scripts.manual_load_pdf` from the repository root.
+3. The script reports loading progress, displays the page count, extracts text
+   page by page, and labels empty pages.
 
-One-shot question mode is planned for a later milestone and is not yet
-implemented.
+The script does not execute chunking or later RAG stages. The interactive
+question loop and one-shot question mode are planned for later milestones and
+are not yet implemented.
 
 ## Testing
 
