@@ -8,3 +8,5 @@ data/chroma/
 dist/
 build/
 *.egg-info/
+data/sample_pdfs/*
+!data/sample_pdfs/.gitkeep

@@ -57,7 +57,56 @@ boundary.
 - Configuration and secret-protection tests pass.
 - No real secret is added to source, documentation, fixtures, or Git history.
 
-## 2. PDF text extraction
+## 2. Document loading
+
+**Status:** In progress
+
+### Objective
+
+Validate and open one local PDF while keeping file loading separate from text
+extraction and all later RAG processing.
+
+### Expected files
+
+```text
+app/document_loader.py
+scripts/manual_load_pdf.py
+tests/test_document_loader.py
+```
+
+### Implementation tasks
+
+- Accept a `str` or `Path` PDF path.
+- Verify that the path exists and is a regular file.
+- Verify that the filename has a `.pdf` extension.
+- Open the file with PyMuPDF.
+- Reject corrupted or unreadable PDFs with a clear error.
+- Reject password-protected PDFs without attempting to bypass protection.
+- Return an open PyMuPDF document and make resource ownership explicit.
+- Keep extraction, chunking, embeddings, vector storage, and CLI behavior out
+  of this milestone.
+- Provide a manually configured verification script that reports successful
+  loading and page count or a clear loading error.
+- Close the document in the manual verification script.
+- Run the manual script from the repository root as
+  `python -m scripts.manual_load_pdf`.
+
+### Tests
+
+- A valid PDF returns an open document with the expected page count.
+- Missing paths produce a clear error.
+- Non-PDF files are rejected.
+- Corrupted PDFs are rejected.
+- Password-protected PDFs are rejected.
+- The manual verification script reports the result and closes a successfully
+  loaded document.
+
+### Completion criteria
+
+The focused document-loader tests pass, and the module contains no text
+extraction or downstream RAG logic.
+
+## 3. PDF text extraction
 
 **Status:** Pending
 
@@ -91,7 +140,7 @@ tests/test_pdf_extractor.py
 Given a valid PDF, extraction returns deterministic page-level records with
 traceable source metadata.
 
-## 3. Chunking
+## 4. Chunking
 
 **Status:** Pending
 
@@ -127,7 +176,7 @@ tests/test_chunker.py
 Chunking is deterministic, independently testable, and every chunk can be
 traced to its source/page.
 
-## 4. Embedding generation
+## 5. Embedding generation
 
 **Status:** Pending
 
@@ -162,7 +211,7 @@ tests/test_embeddings.py
 Local document and query embeddings work through one understandable,
 testable interface without Gemini API calls.
 
-## 5. Vector database storage
+## 6. Vector database storage
 
 **Status:** Pending
 
@@ -197,7 +246,7 @@ tests/test_vector_store.py
 
 Indexed chunks persist and can be queried independently of Gemini.
 
-## 6. Query retrieval
+## 7. Query retrieval
 
 **Status:** Pending
 
@@ -232,7 +281,7 @@ tests/test_retriever.py
 
 A query returns ranked, traceable chunks without calling Gemini.
 
-## 7. Prompt construction
+## 8. Prompt augmentation and construction
 
 **Status:** Pending
 
@@ -267,7 +316,7 @@ tests/test_prompt_builder.py
 
 Prompt construction is deterministic and independently testable.
 
-## 8. Gemini API integration
+## 9. Gemini API integration
 
 **Status:** Pending
 
@@ -310,14 +359,13 @@ tests/test_gemini_client.py
 Gemini usage is isolated to one module, ordinary tests make no network calls,
 and a separate credential-dependent check verifies the selected model.
 
-## 9. End-to-end pipeline
+## 10. End-to-end pipeline
 
 **Status:** Pending
 
 ### Objective
 
-Connect ingestion, retrieval, prompt construction, and answer generation in
-the CLI.
+Connect both RAG phases—document indexing and retrieval/generation—in the CLI.
 
 ### Expected files
 
@@ -329,8 +377,10 @@ tests/test_pipeline.py
 
 ### Implementation tasks
 
-- Orchestrate ingestion.
-- Orchestrate query answering.
+- Orchestrate document loading, text extraction, chunking, local embedding
+  generation, and vector storage for indexing.
+- Orchestrate query embedding, vector search, retrieval, prompt augmentation,
+  Gemini generation, and response formatting.
 - Implement the interactive question loop first.
 - Display answer and available page/source references.
 - Surface missing-file, empty-extraction, configuration, and provider errors.
@@ -349,7 +399,7 @@ tests/test_pipeline.py
 A mocked end-to-end test passes without network access, and the interactive
 CLI is manually verified with a user-provided PDF and API key.
 
-## 10. Testing and retrieval evaluation
+## 11. Testing and retrieval evaluation
 
 **Status:** Pending
 

@@ -14,31 +14,34 @@ should be updated when their documented content changes.
 
 ## System overview
 
-The initial RAG data flow is:
+The initial RAG data flow has two phases:
 
 ```text
-PDF -> text extraction -> chunking -> local embedding generation
-    -> vector storage -> query embedding -> similarity search
-    -> context construction -> Gemini generation
-    -> grounded answer with source references
+Phase 1: Document loading -> text extraction -> chunking
+       -> local embedding generation -> vector storage
+
+Phase 2: User query -> query embedding -> vector search -> retrieval
+       -> prompt augmentation -> Gemini generation
+       -> grounded answer with source references
 ```
 
 ```mermaid
 flowchart TD
-    A[Local PDF] --> B[PyMuPDF extraction]
-    B --> C[Page-level text]
-    C --> D[Custom chunking]
-    D --> E[Local embeddings: all-MiniLM-L6-v2]
-    E --> F[Local ChromaDB collection]
+    A[Local document] --> B[Document loading and validation]
+    B --> C[PyMuPDF text extraction]
+    C --> D[Page-level text]
+    D --> E[Custom chunking]
+    E --> F[Local embeddings: all-MiniLM-L6-v2]
+    F --> G[Local ChromaDB collection]
 
     Q[User query] --> QE[Local query embedding]
-    QE --> S[ChromaDB similarity search]
-    F --> S
-    S --> R[Ranked retrieved chunks]
-    R --> P[Prompt construction]
+    QE --> S[Vector search]
+    G --> S
+    S --> R[Retrieved relevant chunks]
+    R --> P[Prompt augmentation]
     Q --> P
-    P --> G[Gemini API]
-    G --> O[Grounded answer and source references]
+    P --> L[Gemini API generation]
+    L --> O[Grounded answer and source references]
 ```
 
 ## Proposed initial structure
@@ -48,6 +51,7 @@ app/
 ├── __init__.py
 ├── cli.py
 ├── config.py
+├── document_loader.py
 ├── pdf_extractor.py
 ├── chunker.py
 ├── embeddings.py
@@ -57,8 +61,12 @@ app/
 ├── gemini_client.py
 └── pipeline.py
 
+scripts/
+└── manual_load_pdf.py     # developer-only manual loader check
+
 tests/
 ├── test_config.py
+├── test_document_loader.py
 ├── test_pdf_extractor.py
 ├── test_chunker.py
 ├── test_embeddings.py
@@ -76,6 +84,13 @@ This structure is intentionally small. The interactive CLI question loop is
 implemented before the planned one-shot mode. Additional structure should be
 added only when a concrete feature makes the boundary useful.
 
+The `scripts/` directory is separate from `tests/` and contains manually run
+developer checks. `manual_load_pdf.py` exercises only the document-loading
+boundary; it is not part of the automated pytest suite and does not perform
+text extraction or downstream RAG processing. Run it from the repository root
+as `python -m scripts.manual_load_pdf` so the application package resolves
+consistently in VS Code and other Python environments.
+
 ## Component responsibilities and boundaries
 
 ### Configuration
@@ -86,13 +101,30 @@ invalid configuration must produce a helpful error without exposing the API
 key. Other components should receive validated configuration rather than
 reading secrets independently.
 
-### PDF extraction
+### Document loading
 
-`pdf_extractor.py` will open a local PDF with PyMuPDF and produce page-level
-text records. Each record will retain page number and source-document
-metadata. It will report missing, unreadable, and invalid PDFs explicitly.
+`document_loader.py` will validate and open one local PDF with PyMuPDF. It
+will check that the path exists, points to a regular `.pdf` file, and can be
+opened. It will reject corrupted and password-protected PDFs with clear
+application errors.
+
+This module returns an open PyMuPDF document to its caller. The caller owns
+that document and must close it. It does not extract text, chunk content, or
+perform any downstream processing.
 
 **Input:** local PDF path  
+**Output:** open, readable PyMuPDF document
+
+Keeping loading separate from extraction makes file validation and resource
+ownership independently testable.
+
+### Text extraction
+
+`pdf_extractor.py` will open a local PDF with PyMuPDF and produce page-level
+text records from a document provided by the loading boundary. Each record
+will retain page number and source-document metadata.
+
+**Input:** loaded PyMuPDF document and source metadata
 **Output:** ordered page-level text records with metadata
 
 ### Chunking
@@ -194,19 +226,21 @@ references. One-shot question mode is planned for a later milestone.
 ### Ingestion
 
 1. The user supplies one local PDF.
-2. PyMuPDF extracts text page by page.
-3. The custom chunker creates ordered, overlapping chunks.
-4. `all-MiniLM-L6-v2` generates local vectors.
-5. ChromaDB stores chunk text, vectors, IDs, and source/page metadata.
+2. The document loader validates and opens the PDF.
+3. PyMuPDF extracts text page by page.
+4. The custom chunker creates ordered, overlapping chunks.
+5. `all-MiniLM-L6-v2` generates local vectors.
+6. ChromaDB stores chunk text, vectors, IDs, and source/page metadata.
 
 ### Query and generation
 
 1. The user enters a question in the interactive CLI loop.
 2. The local embedding model embeds the question.
-3. ChromaDB performs similarity search.
-4. The retriever returns the top-k chunks.
-5. The prompt builder constructs grounded context with source labels.
-6. Gemini receives the question and retrieved context.
+3. ChromaDB performs vector similarity search.
+4. The retriever returns the most relevant chunks.
+5. The prompt builder augments the question with retrieved context and
+   source labels.
+6. Gemini generates an answer from the augmented prompt.
 7. The CLI displays the answer and source/page references.
 
 ## Important design decisions
