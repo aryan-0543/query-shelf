@@ -5,6 +5,11 @@ from pathlib import Path
 
 from app.chunker import TextChunk, chunk_pages
 from app.document_loader import DocumentLoadError, load_pdf
+from app.embeddings import (
+    DEFAULT_BATCH_SIZE,
+    EmbeddingError,
+    embed_chunks,
+)
 from app.pdf_extractor import TextExtractionError, extract_text
 
 PDF_PATH = Path("Data/sample_pdfs/Clean Code ( PDFDrive.com ).pdf")
@@ -30,6 +35,7 @@ def main() -> None:
         empty_pages = len(pages) - pages_with_text
         total_characters = sum(len(page.text) for page in pages)
         chunks = chunk_pages(pages, PDF_PATH.stem)
+        embedded_chunks = embed_chunks(chunks, batch_size=DEFAULT_BATCH_SIZE)
 
         print("Text extraction completed successfully.")
         print(f"Pages processed: {len(pages)}/{total_pages}")
@@ -37,16 +43,22 @@ def main() -> None:
         print(f"Empty pages: {empty_pages}")
         print(f"Total characters extracted: {total_characters}")
         print(f"Total chunks: {len(chunks)}")
+        print(f"Total embeddings: {len(embedded_chunks)}")
+        dimensions = (
+            embedded_chunks[0].embedding.shape[0] if embedded_chunks else 0
+        )
+        print(f"Embedding dimensions: {dimensions}")
+        print(f"Embedding batch size: {DEFAULT_BATCH_SIZE}")
         print("Chunk metadata examples:")
-        for chunk in chunks[:3]:
-            print(
-                f"  {chunk_metadata_summary(chunk)}"
-            )
+        for embedded_chunk in embedded_chunks[:3]:
+            print(f"  {chunk_metadata_summary(embedded_chunk.chunk)}")
 
     except DocumentLoadError as error:
         print(f"PDF loading failed: {error}")
     except TextExtractionError as error:
         print(f"PDF text extraction failed: {error}")
+    except EmbeddingError as error:
+        print(f"Embedding generation failed: {error}")
     finally:
         if document is not None:
             document.close()
