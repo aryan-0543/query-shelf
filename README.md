@@ -8,16 +8,17 @@ independently.
 
 ## Current status
 
-The document-loading and page-level text-extraction components are implemented
-and covered by focused tests. The remaining RAG pipeline components are still
+The document-loading, page-level text-extraction, token-based chunking, and
+batched local embedding components are implemented and covered by focused
+tests. ChromaDB storage and the remaining RAG pipeline components are still
 planned and have not been implemented or verified.
 
 The planned initial implementation will support:
 
 - One local PDF at a time.
 - Page-aware text extraction with PyMuPDF.
-- Custom Python chunking.
-- Local embeddings using `all-MiniLM-L6-v2`.
+- Custom Python chunking with a 202-token limit and 42-token overlap.
+- Batched local embeddings using `all-MiniLM-L6-v2`.
 - Local ChromaDB storage and similarity retrieval.
 - Grounded answer generation through the official Google Gen AI Python SDK.
 - A command-line interface with an interactive question loop first.
@@ -139,11 +140,12 @@ is:
 1. Set `PDF_PATH` in `scripts/manual_load_pdf.py` to a local PDF.
 2. Run `python -m scripts.manual_load_pdf` from the repository root.
 3. The script reports loading progress, displays the page count, extracts text
-   page by page, and labels empty pages.
+   page by page, labels empty pages, chunks the extracted text, and generates
+   local embeddings.
 
-The script does not execute chunking or later RAG stages. The interactive
-question loop and one-shot question mode are planned for later milestones and
-are not yet implemented.
+The script does not execute ChromaDB storage or later RAG stages. The
+interactive question loop and one-shot question mode are planned for later
+milestones and are not yet implemented.
 
 ## Testing
 

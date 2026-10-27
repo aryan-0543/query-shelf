@@ -13,6 +13,7 @@
 - Explain non-obvious design decisions and justify new dependencies or abstractions.
 - Do not modify unrelated code or introduce features outside the current milestone.
 - Implement one approved milestone at a time.
+- Obtain approval for the milestone before changing application code.
 - Run relevant tests and report actual results. Never claim unverified tests passed.
 - Keep documentation consistent with the actual implementation and verified progress.
 - Before each implementation, read and follow `AGENTS.md`, `ARCHITECTURE.md`, and `IMPLEMENTATION_PLAN.md`.
@@ -26,3 +27,16 @@
 - At milestone completion, review only the relevant documentation and update only what is necessary.
 
 For every feature implementation, continue to update the existing `scripts/manual_load_pdf.py` script to support manual testing, run relevant automated tests, and report actual results.
+
+## Established project workflow
+
+- Keep changes modular, focused, and dependency-light; do not add a library
+  when the existing standard library or project code is sufficient.
+- Add focused tests for each implemented behavior and its important error
+  cases.
+- Use `scripts/manual_load_pdf.py` for manual verification of the implemented
+  PDF ingestion stages.
+- Mark planned behavior as planned until it exists and has been verified.
+- Update `ARCHITECTURE.md` and `IMPLEMENTATION_PLAN.md` at milestone
+  checkpoints, and update this file only when permanent development rules
+  change.
