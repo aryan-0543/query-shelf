@@ -2,9 +2,8 @@
 
 ## Status conventions
 
-Every milestone below is initially **Pending**. A milestone may be marked
-complete only after its implementation and stated verification criteria have
-actually been completed. The project structure is an initial proposal and may
+Every milestone below is **Pending** until its implementation and stated
+verification criteria have actually been completed. The project structure may
 evolve; any feature-driven additions should be proposed and explained before
 implementation, with related documentation updated.
 
@@ -148,7 +147,7 @@ explicitly. Focused extraction tests and the existing loader tests pass.
 
 ## 4. Chunking
 
-**Status:** Pending
+**Status:** Complete
 
 ### Objective
 
@@ -184,7 +183,7 @@ traced to its source/page.
 
 ## 5. Embedding generation
 
-**Status:** Pending
+**Status:** Complete
 
 ### Objective
 
@@ -219,7 +218,7 @@ testable interface without Gemini API calls.
 
 ## 6. Vector database storage
 
-**Status:** Pending
+**Status:** Complete
 
 ### Objective
 
@@ -235,10 +234,15 @@ tests/test_vector_store.py
 ### Implementation tasks
 
 - Create/open a local persistent collection at the approved configurable
-  location, initially proposed as `data/chroma/`.
+  location, defaulting to `data/chroma/`.
 - Generate deterministic chunk IDs.
 - Store text, vectors, and source/page metadata.
 - Define collection replacement or reset behavior.
+- Store existing `EmbeddedChunk` vectors without regenerating embeddings.
+- Validate 384-dimensional vectors and required chunk metadata.
+- Reject duplicate IDs in a batch and conflicting existing records, while
+  allowing safe updates for the same document/chunk.
+- Serialize page-number metadata for ChromaDB and restore it during retrieval.
 
 ### Tests
 
@@ -250,7 +254,8 @@ tests/test_vector_store.py
 
 ### Completion criteria
 
-Indexed chunks persist and can be queried independently of Gemini.
+Indexed chunks persist, can be retrieved by ID, and can be updated safely
+without invoking the embedding model or Gemini.
 
 ## 7. Query retrieval
 

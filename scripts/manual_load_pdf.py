@@ -1,8 +1,8 @@
 
 """Manually verify PDF loading and page-level text extraction."""
 
-from time import perf_counter
 from pathlib import Path
+from time import perf_counter
 
 from app.chunker import TextChunk, chunk_pages
 from app.document_loader import DocumentLoadError, load_pdf
@@ -12,6 +12,7 @@ from app.embeddings import (
     embed_chunks,
 )
 from app.pdf_extractor import TextExtractionError, extract_text
+from app.vector_store import VectorStore, VectorStoreError, chunk_id
 
 PDF_PATH = Path("Data/sample_pdfs/Clean Code ( PDFDrive.com ).pdf")
 
@@ -43,6 +44,13 @@ def main() -> None:
         embedding_started = perf_counter()
         embedded_chunks = embed_chunks(chunks, batch_size=DEFAULT_BATCH_SIZE)
         embedding_elapsed = perf_counter() - embedding_started
+        vector_store = VectorStore()
+        stored_ids = vector_store.store_chunks(embedded_chunks)
+        retrieved_chunks = [
+            vector_store.get_by_id(chunk_id(embedded_chunk))
+            for embedded_chunk in embedded_chunks
+        ]
+        retrieved_count = sum(chunk is not None for chunk in retrieved_chunks)
 
         print(
             f"Text extraction completed successfully "
@@ -64,11 +72,14 @@ def main() -> None:
         )
         print(f"Embedding dimensions: {dimensions}")
         print(f"Embedding batch size: {DEFAULT_BATCH_SIZE}")
+        print(f"Chunks stored: {len(stored_ids)}")
+        print(f"Chunks retrieved by ID: {retrieved_count}")
         print("\nProcessing summary:")
         print(
             f"  Pages: {total_pages} total, {pages_with_text} non-empty | "
             f"Chunks: {len(chunks)} | Embeddings: {len(embedded_chunks)} | "
-            f"Dimensions: {dimensions}"
+            f"Dimensions: {dimensions} | Stored: {len(stored_ids)} | "
+            f"Retrieved: {retrieved_count}"
         )
         print("Chunk metadata examples:")
         for embedded_chunk in embedded_chunks[:3]:
@@ -80,6 +91,8 @@ def main() -> None:
         print(f"PDF text extraction failed: {error}")
     except EmbeddingError as error:
         print(f"Embedding generation failed: {error}")
+    except VectorStoreError as error:
+        print(f"Vector storage failed: {error}")
     finally:
         if document is not None:
             document.close()

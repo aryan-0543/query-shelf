@@ -10,3 +10,4 @@ build/
 *.egg-info/
 data/sample_pdfs/*
 !data/sample_pdfs/.gitkeep
+data/chroma/

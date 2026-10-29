@@ -2,8 +2,10 @@
 
 ## Status and scope
 
-This document describes the proposed initial architecture. The repository currently has verified document-loading and page-level
-text-extraction components. Later RAG components remain planned.
+This document describes the current ingestion architecture. The repository has
+verified document loading, page-level text extraction, token-based chunking,
+batched local embeddings, and persistent ChromaDB storage. Retrieval and
+answer-generation components remain planned.
 
 The file structure below is an initial boundary for learning and testing. It
 may evolve as the project grows. If a feature requires a new module, folder, or
@@ -79,17 +81,14 @@ data/
 └── chroma/                 # generated local persistence; not committed
 ```
 
-This structure is intentionally small. The interactive CLI question loop is
-implemented before the planned one-shot mode. Additional structure should be
-added only when a concrete feature makes the boundary useful.
+This structure is intentionally small. Additional structure should be added
+only when a concrete feature makes the boundary useful.
 
 The `scripts/` directory is separate from `tests/` and contains manually run
-developer checks. `manual_load_pdf.py` exercises only the document-loading
-and page-level text-extraction boundaries; it is not part of the automated
-pytest suite and does not perform chunking or downstream RAG processing. Run
-it from the repository root as `python -m scripts.manual_load_pdf` so the
-application package resolves consistently in VS Code and other Python
-environments.
+developer checks. `manual_load_pdf.py` exercises the implemented ingestion and
+storage flow, including storing and retrieving chunks by ID. It is not part of
+the automated pytest suite. Run it from the repository root as
+`python -m scripts.manual_load_pdf`.
 
 ## Component responsibilities and boundaries
 
@@ -103,7 +102,7 @@ reading secrets independently.
 
 ### Document loading
 
-`document_loader.py` will validate and open one local PDF with PyMuPDF. It
+`document_loader.py` validates and opens one local PDF with PyMuPDF. It
 will check that the path exists, points to a regular `.pdf` file, and can be
 opened. It will reject corrupted and password-protected PDFs with clear
 application errors.
@@ -134,7 +133,7 @@ ownership and page-level extraction independently testable.
 
 ### Chunking
 
-`chunker.py` will use a deterministic custom Python implementation to divide
+`chunker.py` uses a deterministic custom Python implementation to divide
 page text into retrieval-friendly chunks. Chunk size and overlap will be
 configurable. Page and source metadata must travel with every chunk.
 
@@ -147,8 +146,8 @@ those concerns are intentionally outside the initial scope.
 
 ### Local embeddings
 
-`embeddings.py` will load `all-MiniLM-L6-v2` through
-`sentence-transformers`. It will generate vectors for both document chunks
+`embeddings.py` loads `all-MiniLM-L6-v2` through
+`sentence-transformers`. It generates vectors for document chunks
 and user queries using the same model and compatible preprocessing.
 
 Document embeddings are generated locally. Answer generation is separate and
@@ -164,12 +163,17 @@ requirements, and local CPU/GPU performance.
 
 ### Vector storage
 
-`vector_store.py` will create or open a local persistent ChromaDB collection.
-It will store chunk IDs, text, embeddings, and source/page metadata, and expose
-a small interface for insertion and similarity queries.
+`vector_store.py` creates or opens a local persistent ChromaDB collection at
+`data/chroma/` by default. It stores existing `EmbeddedChunk` embeddings
+without regenerating them, along with deterministic chunk IDs, text, and
+document/page/chunk/token metadata. Page numbers are serialized into a
+ChromaDB-compatible string and converted back to a list during retrieval.
+Storage validates 384-dimensional embeddings and required metadata, rejects
+duplicate IDs within a batch, and permits updates only when an existing ID
+still identifies the same document and chunk.
 
-**Input:** chunk records and vectors, or a query vector  
-**Output:** persisted records, or ranked matching records
+**Input:** embedded chunk records
+**Output:** persisted records or records retrieved by ID
 
 ChromaDB keeps the initial project local and avoids remote infrastructure. It
 is not being treated as a multi-user production database at this stage.
@@ -235,7 +239,7 @@ references. One-shot question mode is planned for a later milestone.
 3. PyMuPDF extracts text page by page.
 4. The custom chunker creates ordered, overlapping chunks.
 5. `all-MiniLM-L6-v2` generates local vectors.
-6. ChromaDB stores chunk text, vectors, IDs, and source/page metadata.
+6. ChromaDB stores chunk text, existing vectors, IDs, and source/page metadata.
 
 ### Query and generation
 
@@ -258,7 +262,7 @@ references. One-shot question mode is planned for a later milestone.
   for indexing the complete PDF.
 - **Configurable model:** `GEMINI_MODEL` avoids scattering a model name through
   application code.
-- **Local ChromaDB:** `data/chroma/` is proposed for persistence and should be
+- **Local ChromaDB:** `data/chroma/` is used for persistence and should be
   excluded from Git.
 - **Page-aware metadata:** page information is retained so answers can cite
   source locations.
