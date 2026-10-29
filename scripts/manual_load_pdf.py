@@ -1,6 +1,7 @@
 
 """Manually verify PDF loading and page-level text extraction."""
 
+from time import perf_counter
 from pathlib import Path
 
 from app.chunker import TextChunk, chunk_pages
@@ -29,26 +30,46 @@ def main() -> None:
         print(f"Total pages: {total_pages}")
         print("\nStarting text extraction...")
 
+        extraction_started = perf_counter()
         pages = extract_text(document)
+        extraction_elapsed = perf_counter() - extraction_started
 
         pages_with_text = sum(bool(page.text.strip()) for page in pages)
         empty_pages = len(pages) - pages_with_text
         total_characters = sum(len(page.text) for page in pages)
+        chunking_started = perf_counter()
         chunks = chunk_pages(pages, PDF_PATH.stem)
+        chunking_elapsed = perf_counter() - chunking_started
+        embedding_started = perf_counter()
         embedded_chunks = embed_chunks(chunks, batch_size=DEFAULT_BATCH_SIZE)
+        embedding_elapsed = perf_counter() - embedding_started
 
-        print("Text extraction completed successfully.")
+        print(
+            f"Text extraction completed successfully "
+            f"({extraction_elapsed:.2f}s)."
+        )
         print(f"Pages processed: {len(pages)}/{total_pages}")
         print(f"Pages containing text: {pages_with_text}")
         print(f"Empty pages: {empty_pages}")
         print(f"Total characters extracted: {total_characters}")
+        print(f"Chunking completed successfully ({chunking_elapsed:.2f}s).")
         print(f"Total chunks: {len(chunks)}")
+        print(
+            f"Embedding generation completed successfully "
+            f"({embedding_elapsed:.2f}s)."
+        )
         print(f"Total embeddings: {len(embedded_chunks)}")
         dimensions = (
             embedded_chunks[0].embedding.shape[0] if embedded_chunks else 0
         )
         print(f"Embedding dimensions: {dimensions}")
         print(f"Embedding batch size: {DEFAULT_BATCH_SIZE}")
+        print("\nProcessing summary:")
+        print(
+            f"  Pages: {total_pages} total, {pages_with_text} non-empty | "
+            f"Chunks: {len(chunks)} | Embeddings: {len(embedded_chunks)} | "
+            f"Dimensions: {dimensions}"
+        )
         print("Chunk metadata examples:")
         for embedded_chunk in embedded_chunks[:3]:
             print(f"  {chunk_metadata_summary(embedded_chunk.chunk)}")
