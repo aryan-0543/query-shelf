@@ -1,5 +1,6 @@
 from app.chunker import CHUNK_OVERLAP, CHUNK_SIZE, TextChunk, chunk_pages
 from app.pdf_extractor import PageText
+import pytest
 
 
 class FakeTokenizer:
@@ -134,3 +135,29 @@ def test_toc_like_long_page_handles_decode_boundary_expansion() -> None:
     assert all(chunk.token_count <= CHUNK_SIZE for chunk in chunks)
     assert all(chunk.page_numbers == (8,) for chunk in chunks)
     assert [chunk.chunk_index for chunk in chunks] == list(range(len(chunks)))
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("document_id", "", "document_id"),
+        ("page_numbers", (), "page_numbers"),
+        ("chunk_index", -1, "chunk_index"),
+        ("token_count", -1, "token_count"),
+        ("text", " ", "text"),
+    ],
+)
+def test_text_chunk_validates_required_metadata(
+    field: str, value: object, message: str
+) -> None:
+    values = {
+        "document_id": "document",
+        "page_numbers": (1,),
+        "chunk_index": 0,
+        "text": "text",
+        "token_count": 1,
+    }
+    values[field] = value
+
+    with pytest.raises(ValueError, match=message):
+        TextChunk(**values)

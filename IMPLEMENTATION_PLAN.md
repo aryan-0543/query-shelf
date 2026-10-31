@@ -179,7 +179,8 @@ tests/test_chunker.py
 ### Completion criteria
 
 Chunking is deterministic, independently testable, and every chunk can be
-traced to its source/page.
+traced to its source/page. Chunk construction validates required metadata while
+allowing short and heading-only chunks.
 
 ## 5. Embedding generation
 
@@ -214,7 +215,8 @@ tests/test_embeddings.py
 ### Completion criteria
 
 Local document and query embeddings work through one understandable,
-testable interface without Gemini API calls.
+testable interface without Gemini API calls. Shared model configuration and
+finite-value validation are implemented.
 
 ## 6. Vector database storage
 
@@ -243,6 +245,12 @@ tests/test_vector_store.py
 - Reject duplicate IDs in a batch and conflicting existing records, while
   allowing safe updates for the same document/chunk.
 - Serialize page-number metadata for ChromaDB and restore it during retrieval.
+- Derive stable path-based document IDs separately from SHA-256 content
+  fingerprints.
+- Skip unchanged re-indexing and replace changed-document chunks, removing
+  stale records.
+- Check the stored fingerprint before chunking and embedding so unchanged
+  documents can skip those stages.
 
 ### Tests
 
@@ -255,7 +263,8 @@ tests/test_vector_store.py
 ### Completion criteria
 
 Indexed chunks persist, can be retrieved by ID, and can be updated safely
-without invoking the embedding model or Gemini.
+without invoking the embedding model or Gemini. Changed documents replace
+their previous chunk set, while different document IDs remain isolated.
 
 ## 7. Query retrieval
 

@@ -105,3 +105,12 @@ def test_encoding_errors_are_wrapped() -> None:
 
     with pytest.raises(EmbeddingError, match="Unable to encode"):
         embed_chunks(chunks()[:1], model=FailingModel())
+
+
+@pytest.mark.parametrize("value", [np.nan, np.inf, -np.inf])
+def test_non_finite_embeddings_are_rejected(value: float) -> None:
+    output = np.ones((1, EXPECTED_EMBEDDING_DIMENSION))
+    output[0, 0] = value
+
+    with pytest.raises(EmbeddingError, match="finite"):
+        embed_chunks(chunks()[:1], model=FakeModel(output=output))

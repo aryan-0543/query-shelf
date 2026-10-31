@@ -6,10 +6,8 @@ from typing import Any
 import numpy as np
 
 from app.chunker import TextChunk
-
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+from app.model_config import EXPECTED_EMBEDDING_DIMENSION, MODEL_NAME
 DEFAULT_BATCH_SIZE = 32
-EXPECTED_EMBEDDING_DIMENSION = 384
 
 
 class EmbeddingError(Exception):
@@ -108,6 +106,8 @@ def embed_chunks(
             f"Expected embedding dimension {EXPECTED_EMBEDDING_DIMENSION}, "
             f"received {vectors.shape[1]}"
         )
+    if not np.isfinite(vectors).all():
+        raise EmbeddingError("Embedding values must be finite")
 
     return [
         EmbeddedChunk(chunk=chunk, embedding=vector)

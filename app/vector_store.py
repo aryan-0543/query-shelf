@@ -28,6 +28,7 @@ class StoredChunk:
     page_numbers: list[int]
     chunk_index: int
     token_count: int
+    content_fingerprint: str | None = None
 
 
 def chunk_id(embedded_chunk: EmbeddedChunk) -> str:
@@ -54,7 +55,12 @@ class VectorStore:
             name=collection_name
         )
 
-    def store_chunks(self, chunks: list[EmbeddedChunk]) -> list[str]:
+    def store_chunks(
+        self,
+        chunks: list[EmbeddedChunk],
+        *,
+        content_fingerprint: str | None = None,
+    ) -> list[str]:
         """Store new chunks and safely update existing matching chunks."""
 
         records = [self._validated_record(chunk) for chunk in chunks]
@@ -82,9 +88,74 @@ class VectorStore:
             ids=ids,
             documents=[record[1] for record in records],
             embeddings=[record[2].tolist() for record in records],
-            metadatas=[record[3] for record in records],
+            metadatas=[
+                {
+                    **record[3],
+                    **(
+                        {"content_fingerprint": content_fingerprint}
+                        if content_fingerprint is not None
+                        else {}
+                    ),
+                }
+                for record in records
+            ],
         )
         return ids
+
+    def replace_document(
+        self,
+        document_id: str,
+        content_fingerprint: str,
+        chunks: list[EmbeddedChunk],
+    ) -> bool:
+        """Replace a document's chunks when its content fingerprint changes.
+
+        Returns ``True`` when storage changed and ``False`` when the existing
+        document already has the same fingerprint.
+        """
+
+        if not document_id.strip():
+            raise ValueError("document_id must not be empty")
+        if not content_fingerprint.strip():
+            raise ValueError("content_fingerprint must not be empty")
+        if any(item.chunk.document_id != document_id for item in chunks):
+            raise VectorStoreError("All chunks must belong to document_id")
+
+        existing = self._collection.get(
+            where={"document_id": document_id},
+            include=["metadatas"],
+        )
+        existing_metadata = existing.get("metadatas", [])
+        if existing_metadata and all(
+            metadata
+            and metadata.get("content_fingerprint") == content_fingerprint
+            for metadata in existing_metadata
+        ):
+            return False
+
+        if existing["ids"]:
+            self._collection.delete(ids=existing["ids"])
+        self.store_chunks(chunks, content_fingerprint=content_fingerprint)
+        return True
+
+    def is_current_document(
+        self, document_id: str, content_fingerprint: str
+    ) -> bool:
+        """Return whether a stored document has the supplied fingerprint."""
+
+        if not document_id.strip():
+            raise ValueError("document_id must not be empty")
+        if not content_fingerprint.strip():
+            raise ValueError("content_fingerprint must not be empty")
+        existing = self._collection.get(
+            where={"document_id": document_id},
+            include=["metadatas"],
+        )
+        metadata = existing.get("metadatas", [])
+        return bool(metadata) and all(
+            item and item.get("content_fingerprint") == content_fingerprint
+            for item in metadata
+        )
 
     def get_by_id(self, chunk_id_value: str) -> StoredChunk | None:
         """Retrieve one stored chunk by its unique ID."""
@@ -113,6 +184,7 @@ class VectorStore:
             page_numbers=_parse_page_numbers(str(metadata["page_numbers"])),
             chunk_index=int(metadata["chunk_index"]),
             token_count=int(metadata["token_count"]),
+            content_fingerprint=metadata.get("content_fingerprint"),
         )
 
     @staticmethod
@@ -151,6 +223,8 @@ class VectorStore:
                 f"Expected embedding dimension {EXPECTED_EMBEDDING_DIMENSION}, "
                 f"received shape {embedding.shape}"
             )
+        if not np.isfinite(embedding).all():
+            raise VectorStoreError("Embedding values must be finite")
 
         metadata = {
             "document_id": chunk.document_id,

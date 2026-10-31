@@ -78,25 +78,36 @@ def test_duplicate_ids_in_batch_are_rejected(tmp_path: Path) -> None:
         store.store_chunks([item, item])
 
 
-def test_conflicting_existing_record_is_rejected(tmp_path: Path) -> None:
+def test_same_chunk_update_preserves_document_identity(tmp_path: Path) -> None:
     store = VectorStore(tmp_path / "chroma")
     item = embedded_chunk()
-    store._collection.upsert(
-        ids=[chunk_id(item)],
-        documents=["conflicting"],
-        embeddings=[item.embedding.tolist()],
-        metadatas=[
-            {
-                "document_id": "other-document",
-                "page_numbers": "2",
-                "chunk_index": 0,
-                "token_count": 4,
-            }
-        ],
-    )
 
-    with pytest.raises(VectorStoreError, match="conflicts"):
-        store.store_chunks([item])
+    store.store_chunks([item], content_fingerprint="fingerprint")
+    store.store_chunks([item], content_fingerprint="fingerprint")
+
+    result = store.get_by_id(chunk_id(item))
+    assert result is not None
+    assert result.content_fingerprint == "fingerprint"
+
+
+def test_changed_document_replaces_stale_chunks(tmp_path: Path) -> None:
+    store = VectorStore(tmp_path / "chroma")
+    first = embedded_chunk(chunk_index=0)
+    second = embedded_chunk(chunk_index=1, page_numbers=(3,))
+
+    assert store.replace_document("document", "old", [first, second])
+    assert store.replace_document("document", "new", [first]) is True
+    assert store.get_by_id(chunk_id(second)) is None
+    assert store.get_by_id(chunk_id(first)).content_fingerprint == "new"
+
+
+def test_unchanged_document_skips_replacement(tmp_path: Path) -> None:
+    store = VectorStore(tmp_path / "chroma")
+    item = embedded_chunk()
+
+    assert store.replace_document("document", "same", [item])
+    assert store.replace_document("document", "same", [item]) is False
+    assert store.is_current_document("document", "same")
 
 
 def test_invalid_embedding_dimension_is_rejected(tmp_path: Path) -> None:
@@ -104,6 +115,15 @@ def test_invalid_embedding_dimension_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(VectorStoreError, match="Expected embedding dimension"):
         store.store_chunks([embedded_chunk(dimension=10)])
+
+
+@pytest.mark.parametrize("value", [np.nan, np.inf, -np.inf])
+def test_non_finite_embedding_is_rejected(tmp_path: Path, value: float) -> None:
+    item = embedded_chunk()
+    item.embedding[0] = value
+
+    with pytest.raises(VectorStoreError, match="finite"):
+        VectorStore(tmp_path / "chroma").store_chunks([item])
 
 
 @pytest.mark.parametrize(
@@ -132,5 +152,5 @@ def test_required_metadata_is_validated(
     values[field] = value
     store = VectorStore(tmp_path / "chroma")
 
-    with pytest.raises(VectorStoreError, match=message):
+    with pytest.raises(ValueError, match=message):
         store.store_chunks([embedded_chunk(**values)])

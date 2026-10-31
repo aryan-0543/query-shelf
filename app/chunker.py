@@ -7,12 +7,13 @@ from typing import Any
 
 from transformers import AutoTokenizer
 
+from app.model_config import (
+    CHUNK_OVERLAP,
+    CHUNK_SIZE,
+    MODEL_MAX_LENGTH,
+    MODEL_NAME,
+)
 from app.pdf_extractor import PageText
-
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-CHUNK_SIZE = 202
-CHUNK_OVERLAP = 42
-MODEL_MAX_LENGTH = 256
 
 
 class ChunkingError(Exception):
@@ -28,6 +29,29 @@ class TextChunk:
     chunk_index: int
     text: str
     token_count: int
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.document_id, str) or not self.document_id.strip():
+            raise ValueError("document_id must not be empty")
+        if not self.page_numbers or any(
+            isinstance(page, bool) or not isinstance(page, int) or page <= 0
+            for page in self.page_numbers
+        ):
+            raise ValueError("page_numbers must be positive integers")
+        if (
+            isinstance(self.chunk_index, bool)
+            or not isinstance(self.chunk_index, int)
+            or self.chunk_index < 0
+        ):
+            raise ValueError("chunk_index must be a non-negative integer")
+        if (
+            isinstance(self.token_count, bool)
+            or not isinstance(self.token_count, int)
+            or self.token_count < 0
+        ):
+            raise ValueError("token_count must be a non-negative integer")
+        if not isinstance(self.text, str) or not self.text.strip():
+            raise ValueError("text must not be empty")
 
 
 def _load_tokenizer() -> Any:

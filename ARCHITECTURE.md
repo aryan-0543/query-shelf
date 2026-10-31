@@ -53,7 +53,9 @@ app/
 ├── cli.py
 ├── config.py
 ├── document_loader.py
+├── document_identity.py
 ├── pdf_extractor.py
+├── model_config.py
 ├── chunker.py
 ├── embeddings.py
 ├── vector_store.py
@@ -136,6 +138,9 @@ ownership and page-level extraction independently testable.
 `chunker.py` uses a deterministic custom Python implementation to divide
 page text into retrieval-friendly chunks. Chunk size and overlap will be
 configurable. Page and source metadata must travel with every chunk.
+`TextChunk` validates its document ID, page numbers, chunk index, token count,
+and non-empty text at construction. Short and heading-only chunks remain valid
+and retain page metadata; no arbitrary minimum is imposed.
 
 **Input:** page-level text records  
 **Output:** ordered chunks with source/page metadata
@@ -149,6 +154,9 @@ those concerns are intentionally outside the initial scope.
 `embeddings.py` loads `all-MiniLM-L6-v2` through
 `sentence-transformers`. It generates vectors for document chunks
 and user queries using the same model and compatible preprocessing.
+Shared model, chunking, and dimension constants are kept in
+`model_config.py`. Embedding generation rejects non-finite values in addition
+to invalid shapes.
 
 Document embeddings are generated locally. Answer generation is separate and
 uses Gemini. The PDF is not uploaded to Gemini for embedding or generation as
@@ -171,6 +179,14 @@ ChromaDB-compatible string and converted back to a list during retrieval.
 Storage validates 384-dimensional embeddings and required metadata, rejects
 duplicate IDs within a batch, and permits updates only when an existing ID
 still identifies the same document and chunk.
+
+`document_identity.py` derives `document_id` from the resolved PDF path and
+computes a separate SHA-256 content fingerprint. Re-indexing with the same
+document ID and fingerprint skips storage. A changed fingerprint replaces all
+records for that document and removes stale chunk IDs. Different resolved paths
+remain separate documents even when their filenames match.
+The store exposes a current-fingerprint check so unchanged documents can skip
+chunking, embedding, and storage work before those stages run.
 
 **Input:** embedded chunk records
 **Output:** persisted records or records retrieved by ID
