@@ -70,7 +70,8 @@ app/
 scripts/
 ├── manual_load_pdf.py     # developer-only ingestion check
 ├── manual_query_embedding.py
-└── manual_vector_search.py
+├── manual_vector_search.py
+└── manual_retrieval.py
 
 tests/
 ├── test_config.py
@@ -240,9 +241,13 @@ distances in Python.
 
 ### Retrieval
 
-`retriever.py` will embed a user query locally, query ChromaDB, and return the
-top-k ranked chunks with metadata by composing the completed query and search
-components. It will not call Gemini.
+`retriever.py` composes the validated `UserQuery`, local query embedding, and
+native vector search components. `Retriever.retrieve()` returns immutable
+ranked `RetrievedChunk` records and a `RetrievalResult` containing the original
+query and separate embedding/search timings. It validates returned result
+fields and duplicate chunk IDs while preserving document and page metadata.
+It does not perform reranking, filtering, semantic deduplication, or call
+Gemini.
 
 **Input:** user query and retrieval settings  
 **Output:** ranked chunks, scores where available, and source metadata
@@ -305,13 +310,14 @@ references. One-shot question mode is planned for a later milestone.
 ### Query and generation
 
 1. The user enters a question in the interactive CLI loop.
-2. The local embedding model embeds the question.
-3. ChromaDB performs vector similarity search.
-4. The retriever returns the most relevant chunks.
-5. The prompt builder augments the question with retrieved context and
+2. Query validation returns a `UserQuery`.
+3. The local embedding model embeds the question.
+4. ChromaDB performs vector similarity search.
+5. The retriever validates and ranks the returned candidate chunks.
+6. The prompt builder augments the question with retrieved context and
    source labels.
-6. Gemini generates an answer from the augmented prompt.
-7. The CLI displays the answer and source/page references.
+7. Gemini generates an answer from the augmented prompt.
+8. The CLI displays the answer and source/page references.
 
 ## Important design decisions
 

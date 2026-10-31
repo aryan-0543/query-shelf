@@ -358,7 +358,41 @@ scripts/manual_vector_search.py
 Native ChromaDB search returns ranked, traceable chunk records without fetching
 all embeddings into Python or changing the existing collection.
 
-## 10. Query retrieval
+## 10. Candidate retrieval and result processing
+
+**Status:** Complete
+
+### Objective
+
+Compose validated query embedding and vector similarity search into an
+immutable, traceable candidate-retrieval result.
+
+### Expected files
+
+```text
+app/retriever.py
+tests/test_retriever.py
+scripts/manual_retrieval.py
+```
+
+### Implementation tasks
+
+- Accept a validated `UserQuery` and configurable positive integer `top_k`.
+- Reuse `embed_query()` and `VectorStore.similarity_search()`.
+- Preserve chunk IDs, document IDs, pages, indexes, token counts, and
+  distances.
+- Assign one-based ranks in ChromaDB result order.
+- Record embedding and vector-search timings separately.
+- Reject malformed results and duplicate chunk IDs.
+- Return valid empty results without hiding processing failures.
+
+### Completion criteria
+
+Candidate retrieval returns immutable ranked chunks with source traceability
+and timing information, without implementing reranking, filtering, semantic
+deduplication, prompt construction, or generation.
+
+## 11. Query retrieval
 
 **Status:** Pending
 
@@ -393,7 +427,7 @@ tests/test_retriever.py
 
 A query returns ranked, traceable chunks without calling Gemini.
 
-## 11. Prompt augmentation and construction
+## 12. Prompt augmentation and construction
 
 **Status:** Pending
 
@@ -428,7 +462,7 @@ tests/test_prompt_builder.py
 
 Prompt construction is deterministic and independently testable.
 
-## 12. Gemini API integration
+## 13. Gemini API integration
 
 **Status:** Pending
 
@@ -471,7 +505,7 @@ tests/test_gemini_client.py
 Gemini usage is isolated to one module, ordinary tests make no network calls,
 and a separate credential-dependent check verifies the selected model.
 
-## 13. End-to-end pipeline
+## 14. End-to-end pipeline
 
 **Status:** Pending
 
@@ -511,7 +545,7 @@ tests/test_pipeline.py
 A mocked end-to-end test passes without network access, and the interactive
 CLI is manually verified with a user-provided PDF and API key.
 
-## 14. Testing and retrieval evaluation
+## 15. Testing and retrieval evaluation
 
 **Status:** Pending
 
