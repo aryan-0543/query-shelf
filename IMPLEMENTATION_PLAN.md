@@ -328,7 +328,37 @@ finite values without downloading the embedding model. The manual smoke test
 reports dimensions, finite-value status, and execution time without exposing
 the vector.
 
-## 9. Query retrieval
+## 9. Vector similarity search
+
+**Status:** Complete
+
+### Objective
+
+Search the persistent ChromaDB collection for nearest chunks using a validated
+query embedding.
+
+### Expected files
+
+```text
+app/vector_store.py
+tests/test_vector_store.py
+scripts/manual_vector_search.py
+```
+
+### Implementation tasks
+
+- Validate one-dimensional finite 384-value query embeddings.
+- Validate positive, non-boolean integer `top_k` with a default of 5.
+- Delegate ranking to the existing L2-configured ChromaDB HNSW collection.
+- Return chunk IDs, text, source metadata, token counts, and distances.
+- Handle empty collections and fewer records than requested.
+
+### Completion criteria
+
+Native ChromaDB search returns ranked, traceable chunk records without fetching
+all embeddings into Python or changing the existing collection.
+
+## 10. Query retrieval
 
 **Status:** Pending
 
@@ -363,7 +393,7 @@ tests/test_retriever.py
 
 A query returns ranked, traceable chunks without calling Gemini.
 
-## 10. Prompt augmentation and construction
+## 11. Prompt augmentation and construction
 
 **Status:** Pending
 
@@ -398,7 +428,7 @@ tests/test_prompt_builder.py
 
 Prompt construction is deterministic and independently testable.
 
-## 11. Gemini API integration
+## 12. Gemini API integration
 
 **Status:** Pending
 
@@ -441,7 +471,7 @@ tests/test_gemini_client.py
 Gemini usage is isolated to one module, ordinary tests make no network calls,
 and a separate credential-dependent check verifies the selected model.
 
-## 12. End-to-end pipeline
+## 13. End-to-end pipeline
 
 **Status:** Pending
 
@@ -481,7 +511,7 @@ tests/test_pipeline.py
 A mocked end-to-end test passes without network access, and the interactive
 CLI is manually verified with a user-provided PDF and API key.
 
-## 13. Testing and retrieval evaluation
+## 14. Testing and retrieval evaluation
 
 **Status:** Pending
 

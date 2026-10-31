@@ -5,7 +5,11 @@ import pytest
 
 from app.chunker import TextChunk
 from app.embeddings import EXPECTED_EMBEDDING_DIMENSION, EmbeddedChunk
-from app.vector_store import VectorStore, VectorStoreError, chunk_id
+from app.vector_store import (
+    VectorStore,
+    VectorStoreError,
+    chunk_id,
+)
 
 
 def embedded_chunk(
@@ -16,6 +20,7 @@ def embedded_chunk(
     token_count: int = 4,
     text: str = "chunk text",
     dimension: int = EXPECTED_EMBEDDING_DIMENSION,
+    embedding: np.ndarray | None = None,
 ) -> EmbeddedChunk:
     chunk = TextChunk(
         document_id,
@@ -24,7 +29,9 @@ def embedded_chunk(
         text,
         token_count,
     )
-    return EmbeddedChunk(chunk, np.arange(dimension, dtype=np.float32))
+    if embedding is None:
+        embedding = np.arange(dimension, dtype=np.float32)
+    return EmbeddedChunk(chunk, embedding)
 
 
 def test_store_and_retrieve_chunk(tmp_path: Path) -> None:
@@ -175,3 +182,90 @@ def test_required_metadata_is_validated(
 
     with pytest.raises(ValueError, match=message):
         store.store_chunks([embedded_chunk(**values)])
+
+
+def test_similarity_search_returns_ranked_metadata_and_distances(
+    tmp_path: Path,
+) -> None:
+    store = VectorStore(tmp_path / "chroma")
+    first_embedding = np.zeros(EXPECTED_EMBEDDING_DIMENSION, dtype=np.float32)
+    first_embedding[0] = 1
+    second_embedding = np.zeros(EXPECTED_EMBEDDING_DIMENSION, dtype=np.float32)
+    second_embedding[1] = 1
+    first = embedded_chunk(
+        document_id="first",
+        page_numbers=(1, 2),
+        text="nearest",
+        token_count=2,
+        embedding=first_embedding,
+    )
+    second = embedded_chunk(
+        document_id="second",
+        page_numbers=(3,),
+        text="next",
+        token_count=3,
+        embedding=second_embedding,
+    )
+    store.store_chunks([first, second])
+
+    results = store.similarity_search(first_embedding, top_k=2)
+
+    assert [result.chunk_id for result in results] == [
+        chunk_id(first),
+        chunk_id(second),
+    ]
+    assert results[0].text == "nearest"
+    assert results[0].document_id == "first"
+    assert results[0].page_numbers == [1, 2]
+    assert results[0].chunk_index == 0
+    assert results[0].token_count == 2
+    assert results[0].distance == pytest.approx(0.0)
+    assert results[1].distance > results[0].distance
+
+
+def test_similarity_search_limits_results_and_handles_fewer_records(
+    tmp_path: Path,
+) -> None:
+    store = VectorStore(tmp_path / "chroma")
+    store.store_chunks([embedded_chunk()])
+
+    results = store.similarity_search(np.ones(EXPECTED_EMBEDDING_DIMENSION), top_k=5)
+
+    assert len(results) == 1
+
+
+def test_similarity_search_empty_collection_returns_no_results(
+    tmp_path: Path,
+) -> None:
+    store = VectorStore(tmp_path / "chroma")
+
+    assert store.similarity_search(np.ones(EXPECTED_EMBEDDING_DIMENSION)) == []
+
+
+@pytest.mark.parametrize(
+    "embedding",
+    [
+        np.ones((2, EXPECTED_EMBEDDING_DIMENSION)),
+        np.ones(EXPECTED_EMBEDDING_DIMENSION - 1),
+        ["not", "numeric"],
+        np.full(EXPECTED_EMBEDDING_DIMENSION, np.nan),
+        np.full(EXPECTED_EMBEDDING_DIMENSION, np.inf),
+    ],
+)
+def test_similarity_search_rejects_invalid_embeddings(
+    tmp_path: Path, embedding: object
+) -> None:
+    store = VectorStore(tmp_path / "chroma")
+
+    with pytest.raises(VectorStoreError):
+        store.similarity_search(embedding)
+
+
+@pytest.mark.parametrize("top_k", [True, False, 0, -1, 1.5, "5"])
+def test_similarity_search_rejects_invalid_top_k(
+    tmp_path: Path, top_k: object
+) -> None:
+    store = VectorStore(tmp_path / "chroma")
+
+    with pytest.raises(VectorStoreError, match="top_k"):
+        store.similarity_search(np.ones(EXPECTED_EMBEDDING_DIMENSION), top_k=top_k)

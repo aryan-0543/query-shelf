@@ -2,10 +2,12 @@
 
 ## Status and scope
 
-This document describes the current ingestion architecture. The repository has
-verified document loading, page-level text extraction, token-based chunking,
-batched local embeddings, and persistent ChromaDB storage. Retrieval and
-answer-generation components remain planned.
+This document describes the current ingestion and early retrieval
+architecture. The repository has verified document loading, page-level text
+extraction, token-based chunking, batched local embeddings, persistent
+ChromaDB storage, validated user queries, query embeddings, and native vector
+similarity search. Retrieval orchestration and answer-generation components
+remain planned.
 
 The file structure below is an initial boundary for learning and testing. It
 may evolve as the project grows. If a feature requires a new module, folder, or
@@ -66,7 +68,9 @@ app/
 └── pipeline.py
 
 scripts/
-└── manual_load_pdf.py     # developer-only manual loader check
+├── manual_load_pdf.py     # developer-only ingestion check
+├── manual_query_embedding.py
+└── manual_vector_search.py
 
 tests/
 ├── test_config.py
@@ -196,6 +200,13 @@ chunking, embedding, and storage work before those stages run.
 ChromaDB keeps the initial project local and avoids remote infrastructure. It
 is not being treated as a multi-user production database at this stage.
 
+The store's `similarity_search()` method validates a one-dimensional finite
+384-value query vector and a positive integer `top_k`, then delegates ranking
+to the existing L2-configured ChromaDB HNSW collection. It requests chunk
+documents, metadata, and distances without fetching all embeddings into
+Python. Results contain chunk IDs, text, document/page metadata, token counts,
+and ChromaDB distance values. Empty collections return no results.
+
 ### User query
 
 `query.py` validates and trims a natural-language query without restricting
@@ -217,10 +228,21 @@ vector. It does not classify queries, search ChromaDB, or generate answers.
 **Input:** validated `UserQuery`
 **Output:** one finite query embedding
 
+### Vector similarity search
+
+`VectorStore.similarity_search()` accepts an embedding from `embed_query()`
+and uses native ChromaDB HNSW search against the persistent L2 collection. It
+does not regenerate embeddings, migrate the collection, or calculate
+distances in Python.
+
+**Input:** one finite 384-dimensional query embedding and positive `top_k`
+**Output:** ranked chunk records with text, source metadata, and distances
+
 ### Retrieval
 
 `retriever.py` will embed a user query locally, query ChromaDB, and return the
-top-k ranked chunks with metadata. It will not call Gemini.
+top-k ranked chunks with metadata by composing the completed query and search
+components. It will not call Gemini.
 
 **Input:** user query and retrieval settings  
 **Output:** ranked chunks, scores where available, and source metadata

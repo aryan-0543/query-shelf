@@ -42,6 +42,19 @@ class DocumentStats:
     chunk_ids: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class SimilaritySearchResult:
+    """A chunk returned by native ChromaDB similarity search."""
+
+    chunk_id: str
+    text: str
+    document_id: str
+    page_numbers: list[int]
+    chunk_index: int
+    token_count: int
+    distance: float
+
+
 def chunk_id(embedded_chunk: EmbeddedChunk) -> str:
     """Return a deterministic ID for a document chunk."""
 
@@ -236,6 +249,84 @@ class VectorStore:
             token_count=int(metadata["token_count"]),
             content_fingerprint=metadata.get("content_fingerprint"),
         )
+
+    def similarity_search(
+        self,
+        query_embedding: object,
+        *,
+        top_k: int = 5,
+    ) -> list[SimilaritySearchResult]:
+        """Return the nearest chunks using ChromaDB's native vector search."""
+
+        if (
+            isinstance(top_k, bool)
+            or not isinstance(top_k, int)
+            or top_k <= 0
+        ):
+            raise VectorStoreError("top_k must be a positive integer")
+
+        try:
+            raw_embedding = np.asarray(query_embedding)
+        except (TypeError, ValueError) as error:
+            raise VectorStoreError("Query embedding must be numeric") from error
+        if raw_embedding.dtype.kind not in "iuf":
+            raise VectorStoreError("Query embedding must be numeric")
+        embedding = np.asarray(raw_embedding, dtype=np.float32)
+        if embedding.ndim != 1:
+            raise VectorStoreError("Query embedding must be one-dimensional")
+        if embedding.shape[0] != EXPECTED_EMBEDDING_DIMENSION:
+            raise VectorStoreError(
+                f"Expected query embedding dimension "
+                f"{EXPECTED_EMBEDDING_DIMENSION}, received shape {embedding.shape}"
+            )
+        if not np.isfinite(embedding).all():
+            raise VectorStoreError("Query embedding values must be finite")
+
+        if self._collection.count() == 0:
+            return []
+
+        response = self._collection.query(
+            query_embeddings=[embedding.tolist()],
+            n_results=top_k,
+            include=["documents", "metadatas", "distances"],
+        )
+        ids = response["ids"][0]
+        documents = response.get("documents", [[]])[0]
+        metadata = response.get("metadatas", [[]])[0]
+        distances = response.get("distances", [[]])[0]
+        if not (
+            len(ids)
+            == len(documents)
+            == len(metadata)
+            == len(distances)
+        ):
+            raise VectorStoreError("ChromaDB returned inconsistent search results")
+
+        results: list[SimilaritySearchResult] = []
+        for result_id, text, item, distance in zip(
+            ids, documents, metadata, distances, strict=True
+        ):
+            if item is None:
+                raise VectorStoreError(
+                    f"Search result has no metadata: {result_id}"
+                )
+            try:
+                pages = _parse_page_numbers(str(item["page_numbers"]))
+                result = SimilaritySearchResult(
+                    chunk_id=result_id,
+                    text=text,
+                    document_id=str(item["document_id"]),
+                    page_numbers=pages,
+                    chunk_index=int(item["chunk_index"]),
+                    token_count=int(item["token_count"]),
+                    distance=float(distance),
+                )
+            except (KeyError, TypeError, ValueError) as error:
+                raise VectorStoreError(
+                    f"Search result metadata is invalid: {result_id}"
+                ) from error
+            results.append(result)
+        return results
 
     @staticmethod
     def _validated_record(
