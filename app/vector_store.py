@@ -31,6 +31,17 @@ class StoredChunk:
     content_fingerprint: str | None = None
 
 
+@dataclass(frozen=True)
+class DocumentStats:
+    """Statistics for chunks stored for one document."""
+
+    document_id: str
+    chunk_count: int
+    embedding_dimension: int | None
+    content_fingerprint: str | None
+    chunk_ids: tuple[str, ...]
+
+
 def chunk_id(embedded_chunk: EmbeddedChunk) -> str:
     """Return a deterministic ID for a document chunk."""
 
@@ -155,6 +166,45 @@ class VectorStore:
         return bool(metadata) and all(
             item and item.get("content_fingerprint") == content_fingerprint
             for item in metadata
+        )
+
+    def get_document_stats(self, document_id: str) -> DocumentStats:
+        """Return persisted statistics for one document ID."""
+
+        if not document_id.strip():
+            raise ValueError("document_id must not be empty")
+
+        result = self._collection.get(
+            where={"document_id": document_id},
+            include=["embeddings", "metadatas"],
+        )
+        ids = tuple(result["ids"])
+        metadata = result.get("metadatas", [])
+        embeddings = result.get("embeddings", [])
+        dimensions = {
+            len(embedding)
+            for embedding in embeddings
+            if embedding is not None
+        }
+        if len(dimensions) > 1:
+            raise VectorStoreError(
+                f"Stored embeddings have inconsistent dimensions for {document_id}"
+            )
+        fingerprints = {
+            item.get("content_fingerprint")
+            for item in metadata
+            if item and item.get("content_fingerprint") is not None
+        }
+        if len(fingerprints) > 1:
+            raise VectorStoreError(
+                f"Stored fingerprints are inconsistent for {document_id}"
+            )
+        return DocumentStats(
+            document_id=document_id,
+            chunk_count=len(ids),
+            embedding_dimension=next(iter(dimensions), None),
+            content_fingerprint=next(iter(fingerprints), None),
+            chunk_ids=ids,
         )
 
     def get_by_id(self, chunk_id_value: str) -> StoredChunk | None:

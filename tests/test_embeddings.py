@@ -7,8 +7,10 @@ from app.embeddings import (
     EXPECTED_EMBEDDING_DIMENSION,
     EmbeddingError,
     EmbeddingInputError,
+    embed_query,
     embed_chunks,
 )
+from app.query import UserQuery
 
 
 class FakeTokenizer:
@@ -114,3 +116,41 @@ def test_non_finite_embeddings_are_rejected(value: float) -> None:
 
     with pytest.raises(EmbeddingError, match="finite"):
         embed_chunks(chunks()[:1], model=FakeModel(output=output))
+
+
+def test_query_embedding_uses_model_and_returns_one_vector() -> None:
+    model = FakeModel()
+
+    result = embed_query(UserQuery("What is clean code?"), model=model)
+
+    assert result.shape == (EXPECTED_EMBEDDING_DIMENSION,)
+    assert model.calls[0]["texts"] == ["What is clean code?"]
+    assert model.calls[0]["show_progress_bar"] is False
+
+
+def test_query_embedding_rejects_unvalidated_input() -> None:
+    with pytest.raises(EmbeddingInputError, match="validated UserQuery"):
+        embed_query("What is clean code?")  # type: ignore[arg-type]
+
+
+def test_query_embedding_rejects_model_length_without_truncation() -> None:
+    query = UserQuery(" ".join(["word"] * 8))
+
+    with pytest.raises(EmbeddingInputError, match="maximum is 8"):
+        embed_query(query, model=FakeModel())
+
+
+def test_query_embedding_rejects_invalid_output_shape() -> None:
+    model = FakeModel(output=np.ones((1, 10)))
+
+    with pytest.raises(EmbeddingError, match="query embedding dimension"):
+        embed_query(UserQuery("question"), model=model)
+
+
+@pytest.mark.parametrize("value", [np.nan, np.inf, -np.inf])
+def test_query_embedding_rejects_non_finite_values(value: float) -> None:
+    output = np.ones((1, EXPECTED_EMBEDDING_DIMENSION))
+    output[0, 0] = value
+
+    with pytest.raises(EmbeddingError, match="finite"):
+        embed_query(UserQuery("question"), model=FakeModel(output=output))

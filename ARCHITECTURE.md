@@ -206,6 +206,17 @@ classify intent, embed the query, access ChromaDB, or call an LLM.
 **Input:** raw user-provided string
 **Output:** validated `UserQuery`
 
+### Query embedding
+
+`embed_query()` in `embeddings.py` accepts a validated `UserQuery` and uses
+the same lazily loaded `all-MiniLM-L6-v2` model, tokenizer, and centralized
+configuration as document embedding. It checks the model's actual maximum
+sequence length without truncation, then returns one finite 384-dimensional
+vector. It does not classify queries, search ChromaDB, or generate answers.
+
+**Input:** validated `UserQuery`
+**Output:** one finite query embedding
+
 ### Retrieval
 
 `retriever.py` will embed a user query locally, query ChromaDB, and return the

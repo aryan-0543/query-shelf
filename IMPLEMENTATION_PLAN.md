@@ -297,7 +297,38 @@ tests/test_query.py
 Valid queries preserve their meaning and question style, invalid input raises
 explicit validation errors, and focused tests cover the supported boundary.
 
-## 8. Query retrieval
+## 8. Query embedding
+
+**Status:** Complete
+
+### Objective
+
+Generate one validated local embedding for a normalized `UserQuery`.
+
+### Expected files
+
+```text
+app/embeddings.py
+tests/test_embeddings.py
+scripts/manual_query_embedding.py
+```
+
+### Implementation tasks
+
+- Add a separate `embed_query()` path without changing document embedding.
+- Reuse the existing model-loading and tokenizer infrastructure.
+- Reject queries exceeding the model's actual token limit without truncation.
+- Validate one finite 384-dimensional output vector.
+- Keep query embedding independent of search, retrieval, and generation.
+
+### Completion criteria
+
+Mocked tests verify model reuse, token-length handling, output shape, and
+finite values without downloading the embedding model. The manual smoke test
+reports dimensions, finite-value status, and execution time without exposing
+the vector.
+
+## 9. Query retrieval
 
 **Status:** Pending
 
@@ -332,7 +363,7 @@ tests/test_retriever.py
 
 A query returns ranked, traceable chunks without calling Gemini.
 
-## 9. Prompt augmentation and construction
+## 10. Prompt augmentation and construction
 
 **Status:** Pending
 
@@ -367,7 +398,7 @@ tests/test_prompt_builder.py
 
 Prompt construction is deterministic and independently testable.
 
-## 10. Gemini API integration
+## 11. Gemini API integration
 
 **Status:** Pending
 
@@ -410,7 +441,7 @@ tests/test_gemini_client.py
 Gemini usage is isolated to one module, ordinary tests make no network calls,
 and a separate credential-dependent check verifies the selected model.
 
-## 11. End-to-end pipeline
+## 12. End-to-end pipeline
 
 **Status:** Pending
 
@@ -450,7 +481,7 @@ tests/test_pipeline.py
 A mocked end-to-end test passes without network access, and the interactive
 CLI is manually verified with a user-provided PDF and API key.
 
-## 12. Testing and retrieval evaluation
+## 13. Testing and retrieval evaluation
 
 **Status:** Pending
 

@@ -7,6 +7,8 @@ import numpy as np
 
 from app.chunker import TextChunk
 from app.model_config import EXPECTED_EMBEDDING_DIMENSION, MODEL_NAME
+from app.query import UserQuery
+
 DEFAULT_BATCH_SIZE = 32
 
 
@@ -113,3 +115,59 @@ def embed_chunks(
         EmbeddedChunk(chunk=chunk, embedding=vector)
         for chunk, vector in zip(chunks, vectors, strict=True)
     ]
+
+
+def embed_query(
+    query: UserQuery,
+    *,
+    model: Any | None = None,
+    tokenizer: Any | None = None,
+) -> np.ndarray:
+    """Generate one embedding for a validated user query."""
+
+    if not isinstance(query, UserQuery):
+        raise EmbeddingInputError("Query must be a validated UserQuery")
+
+    model = model or load_embedding_model()
+    tokenizer = tokenizer or model.tokenizer
+    max_seq_length = getattr(model, "max_seq_length", None)
+    if not isinstance(max_seq_length, int) or max_seq_length <= 0:
+        raise EmbeddingError("Embedding model has no valid max_seq_length")
+
+    try:
+        token_ids = tokenizer.encode(
+            query.text,
+            add_special_tokens=True,
+            truncation=False,
+        )
+    except (OSError, RuntimeError, ValueError, TypeError) as error:
+        raise EmbeddingInputError("Unable to tokenize query") from error
+
+    if len(token_ids) > max_seq_length:
+        raise EmbeddingInputError(
+            f"Query has {len(token_ids)} tokens, "
+            f"but the model maximum is {max_seq_length}"
+        )
+
+    try:
+        vector = np.asarray(
+            model.encode(
+                [query.text],
+                convert_to_numpy=True,
+                show_progress_bar=False,
+            )
+        )
+    except Exception as error:
+        raise EmbeddingError("Unable to encode query") from error
+
+    if vector.ndim == 2 and vector.shape == (1, EXPECTED_EMBEDDING_DIMENSION):
+        vector = vector[0]
+    if vector.ndim != 1 or vector.shape[0] != EXPECTED_EMBEDDING_DIMENSION:
+        raise EmbeddingError(
+            f"Expected query embedding dimension "
+            f"{EXPECTED_EMBEDDING_DIMENSION}, received shape {vector.shape}"
+        )
+    if not np.isfinite(vector).all():
+        raise EmbeddingError("Query embedding values must be finite")
+
+    return vector

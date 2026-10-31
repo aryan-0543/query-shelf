@@ -13,7 +13,7 @@ from app.embeddings import (
     embed_chunks,
 )
 from app.pdf_extractor import TextExtractionError, extract_text
-from app.vector_store import VectorStore, VectorStoreError, chunk_id
+from app.vector_store import VectorStore, VectorStoreError
 
 PDF_PATH = Path("Data/sample_pdfs/Clean Code ( PDFDrive.com ).pdf")
 
@@ -67,20 +67,13 @@ def main() -> None:
                 current_fingerprint,
                 embedded_chunks,
             )
-        unchanged = not vector_store.replace_document(
-            current_document_id,
-            current_fingerprint,
-            embedded_chunks,
-        )
+        unchanged = unchanged_before_processing
+        document_stats = vector_store.get_document_stats(current_document_id)
+        stored_ids = document_stats.chunk_ids
         retrieved_chunks = [
-            vector_store.get_by_id(chunk_id(embedded_chunk))
-            for embedded_chunk in embedded_chunks
+            vector_store.get_by_id(stored_id) for stored_id in stored_ids
         ]
-        retrieved_count = (
-            len(embedded_chunks)
-            if unchanged_before_processing
-            else sum(chunk is not None for chunk in retrieved_chunks)
-        )
+        retrieved_count = sum(chunk is not None for chunk in retrieved_chunks)
 
         print(
             f"Text extraction completed successfully "
@@ -97,9 +90,7 @@ def main() -> None:
             f"({embedding_elapsed:.2f}s)."
         )
         print(f"Total embeddings: {len(embedded_chunks)}")
-        dimensions = (
-            embedded_chunks[0].embedding.shape[0] if embedded_chunks else 0
-        )
+        dimensions = document_stats.embedding_dimension or 0
         print(f"Embedding dimensions: {dimensions}")
         print(f"Embedding batch size: {DEFAULT_BATCH_SIZE}")
         print(f"Document fingerprint: {current_fingerprint}")
@@ -108,13 +99,20 @@ def main() -> None:
             f"Unchanged re-index skipped: "
             f"{unchanged_before_processing or unchanged}"
         )
-        print(f"Chunks stored: {len(embedded_chunks)}")
+        if unchanged_before_processing:
+            print(
+                "Document unchanged; re-indexing skipped. "
+                "Existing chunks are preserved in ChromaDB."
+            )
+        print(f"Chunks processed this run: {len(chunks)}")
+        print(f"Embeddings generated this run: {len(embedded_chunks)}")
+        print(f"Chunks already stored in ChromaDB: {document_stats.chunk_count}")
         print(f"Chunks retrieved by ID: {retrieved_count}")
         print("\nProcessing summary:")
         print(
             f"  Pages: {total_pages} total, {pages_with_text} non-empty | "
-            f"Chunks: {len(chunks)} | Embeddings: {len(embedded_chunks)} | "
-            f"Dimensions: {dimensions} | Stored: {len(embedded_chunks)} | "
+            f"Processed: {len(chunks)} | Generated: {len(embedded_chunks)} | "
+            f"Stored: {document_stats.chunk_count} | Dimensions: {dimensions} | "
             f"Retrieved: {retrieved_count}"
         )
         print("Chunk metadata examples:")

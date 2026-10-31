@@ -110,6 +110,27 @@ def test_unchanged_document_skips_replacement(tmp_path: Path) -> None:
     assert store.is_current_document("document", "same")
 
 
+def test_document_stats_are_scoped_to_document_and_preserve_records(
+    tmp_path: Path,
+) -> None:
+    store = VectorStore(tmp_path / "chroma")
+    first = embedded_chunk(document_id="first", chunk_index=0)
+    second = embedded_chunk(document_id="first", chunk_index=1)
+    other = embedded_chunk(document_id="other", chunk_index=0)
+    store.replace_document("first", "fingerprint", [first, second])
+    store.replace_document("other", "other-fingerprint", [other])
+
+    stats = store.get_document_stats("first")
+
+    assert stats.chunk_count == 2
+    assert stats.embedding_dimension == EXPECTED_EMBEDDING_DIMENSION
+    assert stats.content_fingerprint == "fingerprint"
+    assert stats.chunk_ids == (chunk_id(first), chunk_id(second))
+    assert store.get_by_id(chunk_id(first)) is not None
+    assert store.get_by_id(chunk_id(second)) is not None
+    assert store.get_by_id(chunk_id(other)) is not None
+
+
 def test_invalid_embedding_dimension_is_rejected(tmp_path: Path) -> None:
     store = VectorStore(tmp_path / "chroma")
 
