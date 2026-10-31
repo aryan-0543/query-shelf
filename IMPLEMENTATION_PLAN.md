@@ -266,7 +266,38 @@ Indexed chunks persist, can be retrieved by ID, and can be updated safely
 without invoking the embedding model or Gemini. Changed documents replace
 their previous chunk set, while different document IDs remain isolated.
 
-## 7. Query retrieval
+## 7. User query
+
+**Status:** Complete
+
+### Objective
+
+Validate and normalize natural-language user queries before query embedding or
+retrieval.
+
+### Expected files
+
+```text
+app/query.py
+tests/test_query.py
+```
+
+### Implementation tasks
+
+- Accept unrestricted natural-language questions.
+- Trim only leading and trailing whitespace.
+- Reject non-string, empty, and whitespace-only input.
+- Enforce a configurable maximum length with a 2,000-character default.
+- Return a small immutable structured query object.
+- Keep query handling independent of embeddings, ChromaDB, retrieval, and
+  generation.
+
+### Completion criteria
+
+Valid queries preserve their meaning and question style, invalid input raises
+explicit validation errors, and focused tests cover the supported boundary.
+
+## 8. Query retrieval
 
 **Status:** Pending
 
@@ -301,7 +332,7 @@ tests/test_retriever.py
 
 A query returns ranked, traceable chunks without calling Gemini.
 
-## 8. Prompt augmentation and construction
+## 9. Prompt augmentation and construction
 
 **Status:** Pending
 
@@ -336,7 +367,7 @@ tests/test_prompt_builder.py
 
 Prompt construction is deterministic and independently testable.
 
-## 9. Gemini API integration
+## 10. Gemini API integration
 
 **Status:** Pending
 
@@ -379,7 +410,7 @@ tests/test_gemini_client.py
 Gemini usage is isolated to one module, ordinary tests make no network calls,
 and a separate credential-dependent check verifies the selected model.
 
-## 10. End-to-end pipeline
+## 11. End-to-end pipeline
 
 **Status:** Pending
 
@@ -419,7 +450,7 @@ tests/test_pipeline.py
 A mocked end-to-end test passes without network access, and the interactive
 CLI is manually verified with a user-provided PDF and API key.
 
-## 11. Testing and retrieval evaluation
+## 12. Testing and retrieval evaluation
 
 **Status:** Pending
 

@@ -56,6 +56,7 @@ app/
 ├── document_identity.py
 ├── pdf_extractor.py
 ├── model_config.py
+├── query.py
 ├── chunker.py
 ├── embeddings.py
 ├── vector_store.py
@@ -74,6 +75,7 @@ tests/
 ├── test_chunker.py
 ├── test_embeddings.py
 ├── test_vector_store.py
+├── test_query.py
 ├── test_retriever.py
 ├── test_prompt_builder.py
 ├── test_gemini_client.py
@@ -193,6 +195,16 @@ chunking, embedding, and storage work before those stages run.
 
 ChromaDB keeps the initial project local and avoids remote infrastructure. It
 is not being treated as a multi-user production database at this stage.
+
+### User query
+
+`query.py` validates and trims a natural-language query without restricting
+question type. It returns an immutable `UserQuery` containing the normalized
+text and enforces a configurable 2,000-character default maximum. It does not
+classify intent, embed the query, access ChromaDB, or call an LLM.
+
+**Input:** raw user-provided string
+**Output:** validated `UserQuery`
 
 ### Retrieval
 
