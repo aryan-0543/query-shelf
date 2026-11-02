@@ -392,13 +392,14 @@ Candidate retrieval returns immutable ranked chunks with source traceability
 and timing information, without implementing reranking, filtering, semantic
 deduplication, prompt construction, or generation.
 
-## 11. Query retrieval
+## 11. Retrieval orchestration
 
-**Status:** Pending
+**Status:** Complete
 
 ### Objective
 
-Retrieve the most relevant chunks for a user query.
+Orchestrate query embedding and vector similarity search into ranked,
+traceable candidate chunks.
 
 ### Expected files
 
@@ -427,9 +428,38 @@ tests/test_retriever.py
 
 A query returns ranked, traceable chunks without calling Gemini.
 
-## 12. Prompt augmentation and construction
+## 12. Context building
 
-**Status:** Pending
+**Status:** Complete
+
+### Objective
+
+Prepare immutable, source-traceable context from retrieval results while
+enforcing a configurable model-agnostic token budget.
+
+### Expected files
+
+```text
+app/context_builder.py
+tests/test_context_builder.py
+```
+
+### Implementation tasks
+
+- Accept a `RetrievalResult` and preserve retrieval order and source metadata.
+- Format chunks with clear rank, document, page, and chunk labels.
+- Count the combined formatted context with an injectable token counter.
+- Include complete chunks within the budget and report excluded chunks.
+- Avoid duplicate chunk IDs without deduplicating similar text.
+
+### Completion criteria
+
+Context construction returns an immutable structured result without embedding,
+search, LLM calls, prompt instructions, or text truncation.
+
+## 13. Prompt augmentation and construction
+
+**Status:** Complete
 
 ### Objective
 
@@ -440,6 +470,8 @@ Create a grounded prompt from the question and retrieved context.
 ```text
 app/prompt_builder.py
 tests/test_prompt_builder.py
+prompts/system_prompt.md
+scripts/manual_prompt_builder.py
 ```
 
 ### Implementation tasks
@@ -449,6 +481,8 @@ tests/test_prompt_builder.py
 - Instruct the model to use only supplied context.
 - Instruct it to acknowledge insufficient context.
 - Define empty-context behavior.
+- Load trusted system instructions from a module-relative Markdown file.
+- Keep retrieved context delimited and separate from system instructions.
 
 ### Tests
 
@@ -460,11 +494,12 @@ tests/test_prompt_builder.py
 
 ### Completion criteria
 
-Prompt construction is deterministic and independently testable.
+Prompt construction is deterministic, independently testable, and separate
+from Gemini communication.
 
-## 13. Gemini API integration
+## 14. Gemini API integration
 
-**Status:** Pending
+**Status:** Complete
 
 ### Objective
 
@@ -476,6 +511,10 @@ boundary.
 ```text
 app/gemini_client.py
 tests/test_gemini_client.py
+app/llm_client.py
+tests/test_llm_client.py
+scripts/manual_llm_client.py
+.env.example
 ```
 
 ### Implementation tasks
@@ -490,6 +529,8 @@ tests/test_gemini_client.py
   errors clearly.
 - Never log or include API keys in errors.
 - Send only the question and retrieved context required for generation.
+- Use generic `LLM_API_KEY` and `LLM_MODEL` environment variables.
+- Keep system instructions and user content separate in SDK requests.
 
 ### Tests
 
@@ -502,10 +543,10 @@ tests/test_gemini_client.py
 
 ### Completion criteria
 
-Gemini usage is isolated to one module, ordinary tests make no network calls,
-and a separate credential-dependent check verifies the selected model.
+LLM provider usage is isolated to one module, ordinary tests make no network
+calls, and a separate credential-dependent check verifies the selected model.
 
-## 14. End-to-end pipeline
+## 15. End-to-end pipeline
 
 **Status:** Pending
 
@@ -545,7 +586,7 @@ tests/test_pipeline.py
 A mocked end-to-end test passes without network access, and the interactive
 CLI is manually verified with a user-provided PDF and API key.
 
-## 15. Testing and retrieval evaluation
+## 16. Testing and retrieval evaluation
 
 **Status:** Pending
 

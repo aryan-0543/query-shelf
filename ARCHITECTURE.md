@@ -256,22 +256,39 @@ Initial top-k retrieval is simple and interpretable. It may later be extended
 with hybrid search or reranking if evaluation shows that similarity search is
 insufficient.
 
+### Context building
+
+`context_builder.py` converts a `RetrievalResult` into an immutable
+`ContextResult` for future prompt construction. It preserves retrieval order,
+source labels, ranks, document IDs, page numbers, and chunk IDs. It enforces a
+configurable context-token budget using an injectable, model-agnostic token
+counter. Chunks are included whole or excluded without truncation; excluded
+chunks are reported, and distinct chunks are not removed based on similar
+text.
+
+The context builder does not embed queries, search ChromaDB, call Gemini, or
+construct system prompts. A future `prompt_builder.py` will combine this
+structured context with system instructions and the user question.
+
 ### Prompt construction
 
-`prompt_builder.py` will format retrieved chunks with source/page labels,
-include the user question, and provide grounding instructions. The prompt
-will tell the model to answer from the supplied context and acknowledge when
-the context does not support an answer.
+`prompt_builder.py` loads trusted system instructions from
+`prompts/system_prompt.md` and keeps them separate from the user message.
+The user message contains the prepared context and original question in
+explicit delimiters. Retrieved text is treated as untrusted reference data;
+the instructions require context-grounded answers, clear insufficient-context
+responses, and relevant source page citations.
 
 This module will not call Gemini, so prompt formatting can be tested without a
 network connection.
 
 ### Gemini provider integration
 
-`gemini_client.py` will contain all usage of the official `google-genai`
-Python SDK. It will create the client from validated configuration, use the
-configured model, submit the question and retrieved context, and return the
-generated answer.
+`llm_client.py` isolates all usage of the official `google-genai` Python SDK.
+It reads `LLM_API_KEY` and `LLM_MODEL` from environment configuration, sends
+the prompt's system instructions and user message separately, and returns a
+validated generated response. It does not construct prompts or perform
+retrieval.
 
 Only the user query and retrieved context needed for generation should be sent
 to Gemini. The complete PDF should not be uploaded to the API in the initial
