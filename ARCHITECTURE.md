@@ -2,11 +2,12 @@
 
 ## Status and scope
 
-This document describes the current ingestion and early retrieval
+This document describes the current ingestion, retrieval, prompt, and provider
 architecture. The repository has verified document loading, page-level text
 extraction, token-based chunking, batched local embeddings, persistent
-ChromaDB storage, validated user queries, query embeddings, and native vector
-similarity search. Retrieval orchestration and answer-generation components
+ChromaDB storage, validated user queries, query embeddings, native vector
+similarity search, context construction, prompt construction, and isolated
+Gemini generation. End-to-end pipeline orchestration and a user-facing CLI
 remain planned.
 
 The file structure below is an initial boundary for learning and testing. It
@@ -47,13 +48,11 @@ flowchart TD
     L --> O[Grounded answer and source references]
 ```
 
-## Proposed initial structure
+## Current and planned structure
 
 ```text
 app/
 ├── __init__.py
-├── cli.py
-├── config.py
 ├── document_loader.py
 ├── document_identity.py
 ├── pdf_extractor.py
@@ -64,17 +63,18 @@ app/
 ├── vector_store.py
 ├── retriever.py
 ├── prompt_builder.py
-├── gemini_client.py
-└── pipeline.py
+└── llm_client.py
 
 scripts/
 ├── manual_load_pdf.py     # developer-only ingestion check
 ├── manual_query_embedding.py
 ├── manual_vector_search.py
-└── manual_retrieval.py
+├── manual_retrieval.py
+├── manual_context_builder.py
+├── manual_prompt_builder.py
+└── manual_llm_client.py
 
 tests/
-├── test_config.py
 ├── test_document_loader.py
 ├── test_pdf_extractor.py
 ├── test_chunker.py
@@ -83,11 +83,19 @@ tests/
 ├── test_query.py
 ├── test_retriever.py
 ├── test_prompt_builder.py
-├── test_gemini_client.py
-└── test_pipeline.py
+├── test_context_builder.py
+└── test_llm_client.py
 
 data/
 └── chroma/                 # generated local persistence; not committed
+
+prompts/
+└── system_prompt.md        # trusted grounding instructions
+
+# Planned application boundaries
+app/
+├── pipeline.py             # ingestion and question-answering orchestration
+└── cli.py                  # interactive user interface
 ```
 
 This structure is intentionally small. Additional structure should be added
@@ -101,20 +109,20 @@ the automated pytest suite. Run it from the repository root as
 
 ## Component responsibilities and boundaries
 
-### Configuration
+### Configuration and provider settings
 
-`config.py` will load `.env` using `python-dotenv`, read
-`GEMINI_API_KEY` and `GEMINI_MODEL`, and validate required settings. Missing or
-invalid configuration must produce a helpful error without exposing the API
-key. Other components should receive validated configuration rather than
-reading secrets independently.
+There is not yet a shared `config.py`. `llm_client.py` loads `.env` with
+`python-dotenv` and validates `LLM_API_KEY` and `LLM_MODEL` at the provider
+boundary. Callers may also inject the key, model, and SDK client for tests.
+Missing configuration and provider failures are surfaced as `LLMClientError`
+without exposing credentials. A shared configuration boundary can be
+introduced when pipeline orchestration needs settings beyond the provider.
 
 ### Document loading
 
-`document_loader.py` validates and opens one local PDF with PyMuPDF. It
-will check that the path exists, points to a regular `.pdf` file, and can be
-opened. It will reject corrupted and password-protected PDFs with clear
-application errors.
+`document_loader.py` validates and opens one local PDF with PyMuPDF. It checks
+that the path exists, points to a regular `.pdf` file, and can be opened. It
+rejects corrupted and password-protected PDFs with clear application errors.
 
 This module returns an open PyMuPDF document to its caller. The caller owns
 that document and must close it. It does not extract text, chunk content, or
@@ -143,8 +151,8 @@ ownership and page-level extraction independently testable.
 ### Chunking
 
 `chunker.py` uses a deterministic custom Python implementation to divide
-page text into retrieval-friendly chunks. Chunk size and overlap will be
-configurable. Page and source metadata must travel with every chunk.
+page text into retrieval-friendly chunks. Chunk size and overlap are
+configurable. Page and source metadata travel with every chunk.
 `TextChunk` validates its document ID, page numbers, chunk index, token count,
 and non-empty text at construction. Short and heading-only chunks remain valid
 and retain page metadata; no arbitrary minimum is imposed.
@@ -267,8 +275,8 @@ chunks are reported, and distinct chunks are not removed based on similar
 text.
 
 The context builder does not embed queries, search ChromaDB, call Gemini, or
-construct system prompts. A future `prompt_builder.py` will combine this
-structured context with system instructions and the user question.
+construct system prompts. `prompt_builder.py` consumes its structured result
+to combine the context with system instructions and the user question.
 
 ### Prompt construction
 
@@ -279,7 +287,7 @@ explicit delimiters. Retrieved text is treated as untrusted reference data;
 the instructions require context-grounded answers, clear insufficient-context
 responses, and relevant source page citations.
 
-This module will not call Gemini, so prompt formatting can be tested without a
+This module does not call Gemini, so prompt formatting can be tested without a
 network connection.
 
 ### Gemini provider integration
@@ -288,7 +296,8 @@ network connection.
 It reads `LLM_API_KEY` and `LLM_MODEL` from environment configuration, sends
 the prompt's system instructions and user message separately, and returns a
 validated generated response. It does not construct prompts or perform
-retrieval.
+retrieval. The SDK client can be injected so provider behavior remains
+unit-testable without network calls.
 
 Only the user query and retrieved context needed for generation should be sent
 to Gemini. The complete PDF should not be uploaded to the API in the initial
@@ -301,13 +310,13 @@ RAG component should import the Google SDK directly. Replacing Gemini later
 should therefore require changing this adapter and related configuration,
 rather than rewriting extraction or retrieval.
 
-### Pipeline orchestration
+### Pipeline orchestration (planned)
 
 `pipeline.py` will coordinate ingestion and question answering while keeping
 component logic in its own module. Ingestion and query-time flows should
 remain conceptually separate even if the initial CLI coordinates both.
 
-### Command-line interface
+### Command-line interface (planned)
 
 `cli.py` will parse the local PDF input, provide the interactive question
 loop, show useful progress and errors, and print answers with available source
@@ -326,7 +335,7 @@ references. One-shot question mode is planned for a later milestone.
 
 ### Query and generation
 
-1. The user enters a question in the interactive CLI loop.
+1. A future CLI or caller supplies a question.
 2. Query validation returns a `UserQuery`.
 3. The local embedding model embeds the question.
 4. ChromaDB performs vector similarity search.
@@ -334,7 +343,7 @@ references. One-shot question mode is planned for a later milestone.
 6. The prompt builder augments the question with retrieved context and
    source labels.
 7. Gemini generates an answer from the augmented prompt.
-8. The CLI displays the answer and source/page references.
+8. A future CLI displays the answer and source/page references.
 
 ## Important design decisions
 
@@ -344,7 +353,8 @@ references. One-shot question mode is planned for a later milestone.
   query embeddings locally.
 - **Gemini for generation only:** the API is used for answer generation, not
   for indexing the complete PDF.
-- **Configurable model:** `GEMINI_MODEL` avoids scattering a model name through
+- **Configurable model:** `LLM_MODEL` avoids scattering a provider model name
+  through application code. avoids scattering a model name through
   application code.
 - **Local ChromaDB:** `data/chroma/` is used for persistence and should be
   excluded from Git.
