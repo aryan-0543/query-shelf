@@ -267,7 +267,7 @@ insufficient.
 ### Context building
 
 `context_builder.py` converts a `RetrievalResult` into an immutable
-`ContextResult` for future prompt construction. It preserves retrieval order,
+`ContextResult` for prompt construction. It preserves retrieval order,
 source labels, ranks, document IDs, page numbers, and chunk IDs. It enforces a
 configurable context-token budget using an injectable, model-agnostic token
 counter. Chunks are included whole or excluded without truncation; excluded
@@ -354,14 +354,13 @@ references. One-shot question mode is planned for a later milestone.
 - **Gemini for generation only:** the API is used for answer generation, not
   for indexing the complete PDF.
 - **Configurable model:** `LLM_MODEL` avoids scattering a provider model name
-  through application code. avoids scattering a model name through
-  application code.
+  through application code.
 - **Local ChromaDB:** `data/chroma/` is used for persistence and should be
   excluded from Git.
 - **Page-aware metadata:** page information is retained so answers can cite
   source locations.
-- **Interactive-first CLI:** the question loop is the first interface;
-  one-shot mode is deliberately deferred.
+- **Interactive-first CLI (planned):** the question loop is intended to be the
+  first interface; one-shot mode is deliberately deferred.
 - **Mocked provider tests:** unit tests should mock Gemini responses to avoid
   quota usage and network dependence.
 - **Evolving structure:** new files are justified by concrete requirements and
