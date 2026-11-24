@@ -310,6 +310,17 @@ RAG component should import the Google SDK directly. Replacing Gemini later
 should therefore require changing this adapter and related configuration,
 rather than rewriting extraction or retrieval.
 
+### Response processing
+
+`response_processor.py` normalizes the generated answer text and extracts
+page citations without provider-specific logic. Citations are validated
+against pages in the retrieval result; only verified document/page pairs are
+returned as immutable sources. Original answer wording is preserved, so
+unverified citation text may remain in the answer but is never represented as
+a verified source. A valid page reference confirms retrieval presence, not
+that every answer claim is supported. Generation duration is measured by the
+LLM client and carried into the immutable answer.
+
 ### Pipeline orchestration (planned)
 
 `pipeline.py` will coordinate ingestion and question answering while keeping

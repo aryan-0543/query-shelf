@@ -546,7 +546,35 @@ scripts/manual_llm_client.py
 LLM provider usage is isolated to one module, ordinary tests make no network
 calls, and a separate credential-dependent check verifies the selected model.
 
-## 15. End-to-end pipeline
+## 15. Response processing
+
+**Status:** Complete
+
+### Objective
+
+Normalize generated responses and expose only page citations verified against
+the retrieved chunks.
+
+### Expected files
+
+```text
+app/response_processor.py
+tests/test_response_processor.py
+```
+
+### Implementation tasks
+
+- Preserve the generated answer, model, and generation duration.
+- Parse page citations, expand ranges, and remove duplicate document/page pairs.
+- Validate cited pages against retrieved chunk metadata.
+- Keep provider-specific behavior out of response processing.
+
+### Completion criteria
+
+Generated answers and sources are immutable, malformed responses are rejected,
+and unverified citations are never presented as valid sources.
+
+## 16. End-to-end pipeline
 
 **Status:** Pending
 
@@ -586,7 +614,7 @@ tests/test_pipeline.py
 A mocked end-to-end test passes without network access, and the interactive
 CLI is manually verified with a user-provided PDF and API key.
 
-## 16. Testing and retrieval evaluation
+## 17. Testing and retrieval evaluation
 
 **Status:** Pending
 

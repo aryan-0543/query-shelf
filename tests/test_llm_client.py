@@ -47,9 +47,23 @@ def test_generate_sends_separate_system_and_user_content(tmp_path) -> None:
 
     assert result.text == "answer"
     assert result.model == "model"
+    assert result.generation_seconds >= 0
     call = models.calls[0]
     assert "Context" in call["contents"]
     assert call["config"].system_instruction == "System rules"
+
+
+def test_generate_measures_provider_call_duration(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr("app.llm_client.perf_counter", iter([10.0, 11.5]).__next__)
+    client = LLMClient(
+        api_key="key",
+        model="model",
+        client=FakeClient(FakeModels(SimpleNamespace(text="answer"))),
+    )
+
+    result = client.generate(prompt(tmp_path))
+
+    assert result.generation_seconds == 1.5
 
 
 @pytest.mark.parametrize("name", ["LLM_API_KEY", "LLM_MODEL"])

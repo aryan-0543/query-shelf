@@ -2,6 +2,7 @@
 
 import os
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Any
 
 from dotenv import load_dotenv
@@ -19,6 +20,7 @@ class LLMResponse:
 
     text: str
     model: str
+    generation_seconds: float
 
 
 class LLMClient:
@@ -66,17 +68,24 @@ class LLMClient:
         try:
             from google.genai import types
 
+            config = types.GenerateContentConfig(
+                system_instruction=prompt.system_instructions
+            )
+            started = perf_counter()
             response = self._client.models.generate_content(
                 model=self._model,
                 contents=prompt.user_message,
-                config=types.GenerateContentConfig(
-                    system_instruction=prompt.system_instructions,
-                ),
+                config=config,
             )
+            generation_seconds = perf_counter() - started
         except Exception as error:
             raise LLMClientError("LLM generation failed") from error
 
         text = getattr(response, "text", None)
         if not isinstance(text, str) or not text.strip():
             raise LLMClientError("LLM returned an empty response")
-        return LLMResponse(text=text.strip(), model=self._model)
+        return LLMResponse(
+            text=text.strip(),
+            model=self._model,
+            generation_seconds=generation_seconds,
+        )
