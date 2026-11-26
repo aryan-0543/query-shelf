@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 
 from app.llm_client import LLMResponse
-from app.retriever import RetrievedChunk, RetrievalResult
+from app.retriever import RetrievalResult, RetrievedChunk
 
 _PAGE_CITATION = re.compile(
     r"\b(?:pages?|pp?\.?)\s+"

@@ -7,7 +7,7 @@ from app.llm_client import LLMResponse
 from app.pipeline import PipelineTimings, RAGPipeline, RAGPipelineError
 from app.query import UserQuery
 from app.response_processor import GeneratedAnswer, GeneratedSource
-from app.retriever import RetrievedChunk, RetrievalResult
+from app.retriever import RetrievalResult, RetrievedChunk
 
 
 def retrieval(chunks: tuple[RetrievedChunk, ...]) -> RetrievalResult:
